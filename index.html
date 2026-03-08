@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA Toolbox – Made by Huseyin Kesmez</title>
+<meta name="description" content="QA Toolbox – Free tools for QA engineers and developers. Timestamp converter, JSON formatter, JWT decoder, regex tester, regex tester, password generator, UUID generator, hash generator, URL encoder, fake data generator and more.">
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f9f9f9; color:#333; }
+header { background:#4a90e2; color:white; padding:1rem; text-align:center; }
+header small { display:block; font-size:0.8rem; margin-top:0.5rem; }
+nav { background:#fff; position:sticky; top:0; display:flex; overflow-x:auto; border-bottom:1px solid #ccc; }
+nav button { flex:0 0 auto; padding:0.5rem 1rem; border:none; background:none; cursor:pointer; font-weight:bold; }
+nav button:hover { background:#eee; }
+section { padding:1rem; max-width:800px; margin:1rem auto; background:white; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+h2 { display:flex; align-items:center; font-size:1.2rem; }
+.info-icon { margin-left:0.5rem; cursor:pointer; font-weight:bold; color:#4a90e2; }
+.info-box { display:none; padding:0.5rem; margin-top:0.5rem; background:#eef; border-left:3px solid #4a90e2; font-size:0.9rem; border-radius:4px; }
+input, textarea, button { padding:0.5rem; margin:0.25rem 0; width:100%; box-sizing:border-box; border:1px solid #ccc; border-radius:4px; }
+button.copy-btn { width:auto; background:#4a90e2; color:white; border:none; cursor:pointer; margin-top:0.25rem; }
+footer { text-align:center; padding:1rem; font-size:0.8rem; color:#666; }
+pre { white-space: pre-wrap; word-wrap: break-word; background:#f0f0f0; padding:0.5rem; border-radius:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>QA Toolbox</h1>
+  <small>
+    Made by <a href="https://github.com/huseyinkesmez" target="_blank" style="color:white; text-decoration:underline;">Huseyin Kesmez</a> – Free Utilities for QA Engineers & Developers
+  </small>
+</header>
+
+<nav id="nav-bar"></nav>
+
+<main id="tools-container"></main>
+
+<footer>
+  QA Toolbox – Free developer utilities for QA engineers & developers
+</footer>
+
+<script>
+// TOOL CONFIG
+const tools = [
+  {
+    id:'timestamp',
+    title:'Timestamp Converter',
+    info:'Convert Unix timestamps to readable dates and vice versa. Useful for QA log checks and automation testing. Example: 1709914800 → 2024-03-08 12:00 UTC',
+    html:`<input type="number" id="ts-input" placeholder="Enter Unix timestamp or date in ms">
+    <button onclick="convertTimestamp()">Convert</button>
+    <pre id="ts-output"></pre>
+    <button class="copy-btn" onclick="copyText('ts-output')">Copy</button>`,
+    js:`function convertTimestamp() {
+      const input = document.getElementById('ts-input').value;
+      if(!input) return;
+      let date;
+      if(input.length>10){ date = new Date(Number(input)); } else { date = new Date(Number(input)*1000);}
+      document.getElementById('ts-output').innerText = 'UTC: '+date.toUTCString()+'\\nLocal: '+date.toLocaleString();
+    }`
+  },
+  {
+    id:'json',
+    title:'JSON Formatter & Validator',
+    info:'Format and validate JSON data. QA engineers use this to debug API responses. Example: {"name":"John"} → formatted JSON',
+    html:`<textarea id="json-input" rows="5" placeholder='Paste JSON here'></textarea>
+    <button onclick="formatJSON()">Format JSON</button>
+    <pre id="json-output"></pre>
+    <button class="copy-btn" onclick="copyText('json-output')">Copy</button>`,
+    js:`function formatJSON(){
+      const input=document.getElementById('json-input').value;
+      try{const obj=JSON.parse(input);document.getElementById('json-output').innerText=JSON.stringify(obj,null,2);}
+      catch(e){document.getElementById('json-output').innerText='Invalid JSON';}
+    }`
+  },
+  {
+    id:'jwt',
+    title:'JWT Decoder',
+    info:'Decode JWT tokens to inspect header, payload, and signature. QA often uses this for testing authentication flows.',
+    html:`<textarea id="jwt-input" rows="3" placeholder='Paste JWT token here'></textarea>
+    <button onclick="decodeJWT()">Decode</button>
+    <pre id="jwt-output"></pre>
+    <button class="copy-btn" onclick="copyText('jwt-output')">Copy</button>`,
+    js:`function decodeJWT(){
+      const token=document.getElementById('jwt-input').value.trim();
+      if(!token) return;
+      try{
+        const parts=token.split('.');
+        const header=JSON.parse(atob(parts[0]));
+        const payload=JSON.parse(atob(parts[1]));
+        const signature=parts[2];
+        document.getElementById('jwt-output').innerText='Header:\\n'+JSON.stringify(header,null,2)+'\\n\\nPayload:\\n'+JSON.stringify(payload,null,2)+'\\n\\nSignature:\\n'+signature;
+      }catch(e){document.getElementById('jwt-output').innerText='Invalid JWT';}
+    }`
+  },
+  {
+    id:'base64',
+    title:'Base64 Encoder/Decoder',
+    info:'Encode and decode Base64. Useful for tokens, auth headers, and data encoding.',
+    html:`<textarea id="b64-input" rows="2" placeholder='Enter text or Base64'></textarea>
+    <button onclick="encodeBase64()">Encode</button>
+    <button onclick="decodeBase64()">Decode</button>
+    <pre id="b64-output"></pre>
+    <button class="copy-btn" onclick="copyText('b64-output')">Copy</button>`,
+    js:`function encodeBase64(){const v=document.getElementById('b64-input').value;document.getElementById('b64-output').innerText=btoa(v);}
+        function decodeBase64(){try{const v=document.getElementById('b64-input').value;document.getElementById('b64-output').innerText=atob(v);}catch(e){document.getElementById('b64-output').innerText='Invalid Base64';}}`
+  },
+  {
+    id:'url',
+    title:'URL Encoder/Decoder',
+    info:'Encode or decode URL strings to avoid broken requests in QA testing.',
+    html:`<input type="text" id="url-input" placeholder='Enter URL'>
+    <button onclick="encodeURL()">Encode</button>
+    <button onclick="decodeURL()">Decode</button>
+    <pre id="url-output"></pre>
+    <button class="copy-btn" onclick="copyText('url-output')">Copy</button>`,
+    js:`function encodeURL(){const v=document.getElementById('url-input').value;document.getElementById('url-output').innerText=encodeURIComponent(v);}
+        function decodeURL(){const v=document.getElementById('url-input').value;document.getElementById('url-output').innerText=decodeURIComponent(v);}`
+  },
+  {
+    id:'regex',
+    title:'Regex Tester',
+    info:'Test regex patterns against input strings. QA uses this to validate input and parse logs.',
+    html:`<input type="text" id="regex-pattern" placeholder='Regex pattern'>
+    <textarea id="regex-input" rows="3" placeholder='Test string'></textarea>
+    <button onclick="testRegex()">Test Regex</button>
+    <pre id="regex-output"></pre>
+    <button class="copy-btn" onclick="copyText('regex-output')">Copy</button>`,
+    js:`function testRegex(){try{const p=document.getElementById('regex-pattern').value;const t=document.getElementById('regex-input').value;const r=new RegExp(p,'g');const matches=t.match(r);document.getElementById('regex-output').innerText=matches?matches.join('\\n'):'No match';}catch(e){document.getElementById('regex-output').innerText='Invalid regex';}}`
+  },
+  {
+    id:'password',
+    title:'Password Generator',
+    info:'Generate secure passwords for test accounts.',
+    html:`<input type="number" id="pass-length" placeholder='Length' value=12>
+    <button onclick="generatePassword()">Generate</button>
+    <pre id="pass-output"></pre>
+    <button class="copy-btn" onclick="copyText('pass-output')">Copy</button>`,
+    js:`function generatePassword(){const l=Number(document.getElementById('pass-length').value)||12;const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';let p='';for(let i=0;i<l;i++){p+=chars.charAt(Math.floor(Math.random()*chars.length));}document.getElementById('pass-output').innerText=p;}`
+  },
+  {
+    id:'http',
+    title:'HTTP Status Code Lookup',
+    info:'Lookup HTTP status code description. QA uses this to verify API responses.',
+    html:`<input type="number" id="http-code" placeholder='Enter HTTP code'>
+    <button onclick="lookupHTTP()">Lookup</button>
+    <pre id="http-output"></pre>
+    <button class="copy-btn" onclick="copyText('http-output')">Copy</button>`,
+    js:`const httpCodes={200:'OK',301:'Moved Permanently',400:'Bad Request',401:'Unauthorized',403:'Forbidden',404:'Not Found',500:'Internal Server Error'};
+    function lookupHTTP(){const c=document.getElementById('http-code').value;document.getElementById('http-output').innerText=httpCodes[c]||'Unknown code';}`
+  },
+  {
+    id:'uuid',
+    title:'UUID Generator',
+    info:'Generate UUIDs for test data or mock records.',
+    html:`<button onclick="generateUUID()">Generate UUID</button>
+    <pre id="uuid-output"></pre>
+    <button class="copy-btn" onclick="copyText('uuid-output')">Copy</button>`,
+    js:`function generateUUID(){function s4(){return Math.floor((1+Math.random())*0x10000).toString(16).substring(1);}document.getElementById('uuid-output').innerText=s4()+s4()+'-'+s4()+'-'+s4()+'-'+s4()+'-'+s4()+s4()+s4();}`
+  },
+  {
+    id:'hash',
+    title:'Hash Generator',
+    info:'Generate MD5/SHA1/SHA256 hashes for test data.',
+    html:`<input type="text" id="hash-input" placeholder='Enter text'>
+    <button onclick="hashText()">Generate SHA256</button>
+    <pre id="hash-output"></pre>
+    <button class="copy-btn" onclick="copyText('hash-output')">Copy</button>`,
+    js:`async function hashText(){const text=document.getElementById('hash-input').value;const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));const hash=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');document.getElementById('hash-output').innerText=hash;}`
+  },
+  {
+    id:'query',
+    title:'Query Parameter Parser',
+    info:'Parse URL query parameters for debugging links and API calls.',
+    html:`<input type="text" id="query-url" placeholder='Enter URL'>
+    <button onclick="parseQuery()">Parse</button>
+    <pre id="query-output"></pre>
+    <button class="copy-btn" onclick="copyText('query-output')">Copy</button>`,
+    js:`function parseQuery(){try{const url=new URL(document.getElementById('query-url').value);let out='';url.searchParams.forEach((v,k)=>{out+=k+': '+v+'\\n';});document.getElementById('query-output').innerText=out;}catch(e){document.getElementById('query-output').innerText='Invalid URL';}}`
+  },
+  {
+    id:'jsoncsv',
+    title:'JSON ↔ CSV Converter',
+    info:'Convert JSON to CSV and CSV to JSON for QA data import/export.',
+    html:`<textarea id="jsoncsv-input" rows="5" placeholder='Paste JSON or CSV'></textarea>
+    <button onclick="jsonToCsv()">JSON → CSV</button>
+    <button onclick="csvToJson()">CSV → JSON</button>
+    <pre id="jsoncsv-output"></pre>
+    <button class="copy-btn" onclick="copyText('jsoncsv-output')">Copy</button>`,
+    js:`function jsonToCsv(){try{const obj=JSON.parse(document.getElementById('jsoncsv-input').value);if(!obj.length)obj=[obj];const keys=Object.keys(obj[0]);let csv=keys.join(',')+'\\n';obj.forEach(o=>{csv+=keys.map(k=>o[k]).join(',')+'\\n';});document.getElementById('jsoncsv-output').innerText=csv;}catch(e){document.getElementById('jsoncsv-output').innerText='Invalid JSON';}}
+    function csvToJson(){try{const lines=document.getElementById('jsoncsv-input').value.split('\\n');const keys=lines[0].split(',');const arr=[];for(let i=1;i<lines.length;i++){if(!lines[i])continue;const obj={};lines[i].split(',').forEach((v,j)=>{obj[keys[j]]=v;});arr.push(obj);}document.getElementById('jsoncsv-output').innerText=JSON.stringify(arr,null,2);}catch(e){document.getElementById('jsoncsv-output').innerText='Invalid CSV';}}`
+  },
+  {
+    id:'fakedata',
+    title:'Fake Test Data Generator',
+    info:'Generate random names, emails, phone numbers, addresses, UUIDs for QA testing.',
+    html:`<button onclick="generateFake()">Generate</button>
+    <pre id="fakedata-output"></pre>
+    <button class="copy-btn" onclick="copyText('fakedata-output')">Copy</button>`,
+    js:`function generateFake(){const names=['John','Alice','Bob','Eve'];const emails=['test@example.com','abc@test.com'];const phones=['+1234567890','+9876543210'];const addrs=['123 Main St','456 Oak Ave'];document.getElementById('fakedata-output').innerText='Name: '+names[Math.floor(Math.random()*names.length)]+'\\nEmail: '+emails[Math.floor(Math.random()*emails.length)]+'\\nPhone: '+phones[Math.floor(Math.random()*phones.length)]+'\\nAddress: '+addrs[Math.floor(Math.random()*addrs.length)];}`
+  },
+  {
+    id:'deeplink',
+    title:'Deep Link Tester',
+    info:'Test deep links for mobile apps. QA uses this to verify navigation flows.',
+    html:`<input type="text" id="deeplink-input" placeholder='Enter deep link'>
+    <button onclick="openDeepLink()">Open</button>
+    <pre id="deeplink-output"></pre>
+    <button class="copy-btn" onclick="copyText('deeplink-output')">Copy</button>`,
+    js:`function openDeepLink(){const url=document.getElementById('deeplink-input').value;document.getElementById('deeplink-output').innerText=url;window.open(url,'_blank');}`
+  },
+  {
+    id:'cron',
+    title:'Cron Expression Reader',
+    info:'Interpret cron expressions in human readable format for QA automation schedules.',
+    html:`<input type="text" id="cron-input" placeholder='Enter cron expression'>
+    <button onclick="readCron()">Read</button>
+    <pre id="cron-output"></pre>
+    <button class="copy-btn" onclick="copyText('cron-output')">Copy</button>`,
+    js:`function readCron(){const c=document.getElementById('cron-input').value;document.getElementById('cron-output').innerText='Cron input: '+c+' (Human readable parsing not implemented in demo)';}`
+  }
+];
+
+// Render nav & sections
+const nav=document.getElementById('nav-bar');
+const container=document.getElementById('tools-container');
+tools.forEach(tool=>{
+  const btn=document.createElement('button');
+  btn.textContent=tool.title;
+  btn.onclick=()=>document.getElementById(tool.id).scrollIntoView({behavior:'smooth'});
+  nav.appendChild(btn);
+
+  const sec=document.createElement('section');
+  sec.id=tool.id;
+  sec.innerHTML=`<h2>${tool.title} <span class="info-icon" onclick="toggleInfo('${tool.id}-info')">ℹ️</span></h2>
+  <div class="info-box" id="${tool.id}-info">${tool.info}</div>
+  ${tool.html}`;
+  container.appendChild(sec);
+
+  // Inject JS
+  const script=document.createElement('script');
+  script.innerHTML=tool.js;
+  document.body.appendChild(script);
+});
+
+// Common functions
+function toggleInfo(id){const b=document.getElementById(id);b.style.display=(b.style.display==='block')?'none':'block';}
+function copyText(id){const t=document.getElementById(id).innerText;navigator.clipboard.writeText(t);alert('Copied to clipboard!');}
+</script>
+</body>
+</html>
