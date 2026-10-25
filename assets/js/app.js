@@ -1,29 +1,65 @@
 /* ==========================================================================
-   App shell: renders tools, search, categories, theme, persistence
+   App shell: sidebar, routing, home page, favorites, recents,
+   command palette (Ctrl/Cmd + K), theme and input persistence
    ========================================================================== */
 'use strict';
 
 (() => {
-  const container = document.getElementById('tools-container');
-  const searchInput = document.getElementById('tool-search');
-  const chipsEl = document.getElementById('category-chips');
-  const quickNav = document.getElementById('quick-nav');
+  const MAX_RECENT = 5;
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const toolById = new Map(TOOLS.map((t) => [t.id, t]));
+  const categoryIcon = Object.fromEntries(CATEGORIES.map((c) => [c.name, c.icon]));
 
-  const state = {
-    query: '',
-    category: QA.storage.get('category', 'All'),
+  const el = {
+    container: document.getElementById('tools-container'),
+    home: document.getElementById('home'),
+    homeGroups: document.getElementById('home-groups'),
+    sidebar: document.getElementById('sidebar'),
+    sidebarNav: document.getElementById('sidebar-nav'),
+    backdrop: document.getElementById('sidebar-backdrop'),
+    menuBtn: document.getElementById('menu-btn'),
+    breadcrumb: document.getElementById('breadcrumb'),
+    palette: document.getElementById('palette'),
+    paletteInput: document.getElementById('palette-input'),
+    paletteList: document.getElementById('palette-list'),
   };
-  if (state.category !== 'All' && !CATEGORIES.includes(state.category)) state.category = 'All';
+
+  /** First sentence of the info text, used on cards and in the palette. */
+  const summary = (tool) => tool.info.split(/(?<=[.!?])\s+(?=[A-Z"])/)[0];
+
+  /* ---------- Favorites & recents ---------- */
+
+  const validIds = (ids) => (Array.isArray(ids) ? ids.filter((id) => toolById.has(id)) : []);
+  let favorites = validIds(QA.storage.get('favorites', []));
+  let recents = validIds(QA.storage.get('recents', []));
+
+  const isFavorite = (id) => favorites.includes(id);
+
+  const toggleFavorite = (id) => {
+    favorites = isFavorite(id) ? favorites.filter((f) => f !== id) : [...favorites, id];
+    QA.storage.set('favorites', favorites);
+    QA.toast(isFavorite(id) ? `★ Added ${toolById.get(id).title} to favorites` : `Removed ${toolById.get(id).title} from favorites`);
+    renderNavigation();
+    if (!el.palette.hidden) renderPalette();
+  };
+
+  const addRecent = (id) => {
+    recents = [id, ...recents.filter((r) => r !== id)].slice(0, MAX_RECENT);
+    QA.storage.set('recents', recents);
+  };
+
+  const starButton = (id, extraClass = '') => `
+    <button type="button" class="icon-btn star-btn ${extraClass}" data-fav="${id}" aria-pressed="${isFavorite(id)}"
+            aria-label="${isFavorite(id) ? 'Remove from' : 'Add to'} favorites" title="${isFavorite(id) ? 'Remove from' : 'Add to'} favorites">
+      <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    </button>`;
 
   /* ---------- Theme ---------- */
 
-  const setTheme = (theme) => {
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = theme;
     QA.storage.set('theme', theme);
-  };
-
-  document.getElementById('theme-toggle').addEventListener('click', () => {
-    setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
   });
 
   // Follow the OS theme until the user picks one explicitly.
@@ -31,7 +67,7 @@
     if (!QA.storage.get('theme')) document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
   });
 
-  /* ---------- Rendering ---------- */
+  /* ---------- Tool sections ---------- */
 
   const createToolUi = (tool, section) => ({
     $: (ref) => section.querySelector(`[data-ref="${ref}"]`),
@@ -42,41 +78,40 @@
 
   /** Restore every [data-persist] field of a tool and save it again whenever it changes. */
   const bindPersistence = (tool, section) => {
-    section.querySelectorAll('[data-persist]').forEach((el) => {
-      const key = `${tool.id}.field.${el.dataset.ref}`;
-      const isCheckbox = el.type === 'checkbox';
+    section.querySelectorAll('[data-persist]').forEach((field) => {
+      const key = `${tool.id}.field.${field.dataset.ref}`;
+      const isCheckbox = field.type === 'checkbox';
       const saved = QA.storage.get(key);
 
       if (saved !== null) {
-        if (isCheckbox) el.checked = saved;
-        else el.value = saved;
+        if (isCheckbox) field.checked = saved;
+        else field.value = saved;
       }
 
-      const save = () => QA.storage.set(key, isCheckbox ? el.checked : el.value);
-      el.addEventListener(isCheckbox || el.tagName === 'SELECT' ? 'change' : 'input', save);
+      const save = () => QA.storage.set(key, isCheckbox ? field.checked : field.value);
+      field.addEventListener(isCheckbox || field.tagName === 'SELECT' ? 'change' : 'input', save);
     });
   };
 
+  /** All tools are rendered once (so their state survives navigation); only the active one is shown. */
   const renderTool = (tool) => {
     const section = document.createElement('section');
     section.className = 'tool';
-    section.id = tool.id;
+    section.id = `tool-${tool.id}`;
+    section.hidden = true;
     section.setAttribute('aria-labelledby', `${tool.id}-title`);
     section.innerHTML = `
       <div class="tool-header">
-        <div>
-          <h2 class="tool-title" id="${tool.id}-title"><span aria-hidden="true">${tool.icon}</span> ${tool.title}</h2>
-          <span class="tool-category">${tool.category}</span>
+        <div class="tool-heading">
+          <h1 class="tool-title" id="${tool.id}-title"><span aria-hidden="true">${tool.icon}</span> ${tool.title}</h1>
+          <p class="tool-info">${tool.info}</p>
         </div>
-        <button type="button" class="icon-btn" data-info-toggle aria-expanded="false" aria-controls="${tool.id}-info" aria-label="About ${tool.title}" title="About this tool">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-        </button>
+        <span data-star-slot></span>
       </div>
-      <p class="tool-info" id="${tool.id}-info" hidden>${tool.info}</p>
       <div class="tool-body">${tool.template}</div>`;
 
     bindPersistence(tool, section);
-    container.appendChild(section);
+    el.container.appendChild(section);
 
     try {
       tool.setup(createToolUi(tool, section));
@@ -88,19 +123,257 @@
 
   const sections = new Map(TOOLS.map((tool) => [tool.id, renderTool(tool)]));
 
-  const emptyState = document.createElement('p');
-  emptyState.className = 'empty-state';
-  emptyState.hidden = true;
-  container.appendChild(emptyState);
+  /* ---------- Sidebar & home ---------- */
 
-  /* ---------- Shared tool interactions (event delegation) ---------- */
+  const navLink = (tool) => `
+    <a href="#${tool.id}" class="nav-link" data-tool="${tool.id}">
+      <span class="nav-icon" aria-hidden="true">${tool.icon}</span>
+      <span class="nav-label">${tool.title}</span>
+    </a>`;
 
-  container.addEventListener('click', (e) => {
-    const infoBtn = e.target.closest('[data-info-toggle]');
-    if (infoBtn) {
-      const box = document.getElementById(infoBtn.getAttribute('aria-controls'));
-      box.hidden = !box.hidden;
-      infoBtn.setAttribute('aria-expanded', String(!box.hidden));
+  const navGroup = (title, icon, tools) => (tools.length ? `
+    <div class="nav-group">
+      <h2 class="nav-group-title"><span aria-hidden="true">${icon}</span> ${title}</h2>
+      ${tools.map(navLink).join('')}
+    </div>` : '');
+
+  const toolCard = (tool) => `
+    <a href="#${tool.id}" class="tool-card">
+      <span class="tool-card-icon" aria-hidden="true">${tool.icon}</span>
+      <span class="tool-card-text">
+        <span class="tool-card-title">${tool.title}</span>
+        <span class="tool-card-desc">${QA.escapeHtml(summary(tool))}</span>
+      </span>
+      ${starButton(tool.id, 'card-star')}
+    </a>`;
+
+  const homeGroup = (title, icon, tools) => (tools.length ? `
+    <section class="home-group">
+      <h2 class="home-group-title"><span aria-hidden="true">${icon}</span> ${title}</h2>
+      <div class="card-grid">${tools.map(toolCard).join('')}</div>
+    </section>` : '');
+
+  const toolsIn = (category) => TOOLS.filter((t) => t.category === category);
+  const byIds = (ids) => ids.map((id) => toolById.get(id));
+
+  /** Re-render everything that depends on favorites / recents / the active tool. */
+  const renderNavigation = () => {
+    el.sidebarNav.innerHTML = [
+      navGroup('Favorites', '★', byIds(favorites)),
+      navGroup('Recent', '🕘', byIds(recents)),
+      ...CATEGORIES.map((c) => navGroup(c.name, c.icon, toolsIn(c.name))),
+    ].join('');
+
+    el.homeGroups.innerHTML = [
+      favorites.length
+        ? homeGroup('Favorites', '★', byIds(favorites))
+        : '<p class="hint home-tip">Tip: click the ☆ on any tool to pin it to Favorites.</p>',
+      homeGroup('Recently used', '🕘', byIds(recents)),
+      ...CATEGORIES.map((c) => homeGroup(c.name, c.icon, toolsIn(c.name))),
+    ].join('');
+
+    sections.forEach((section, id) => {
+      section.querySelector('[data-star-slot]').innerHTML = starButton(id);
+    });
+    markActiveLink();
+  };
+
+  /* ---------- Routing (#tool-id) ---------- */
+
+  let activeId = null;
+
+  const markActiveLink = () => {
+    el.sidebarNav.querySelectorAll('.nav-link').forEach((a) => {
+      if (a.dataset.tool === activeId) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+  };
+
+  const showRoute = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const tool = toolById.get(id);
+    activeId = tool ? tool.id : null;
+
+    el.home.hidden = Boolean(tool);
+    sections.forEach((section, sid) => { section.hidden = sid !== activeId; });
+
+    if (tool) {
+      addRecent(tool.id);
+      document.title = `${tool.title} – QA Toolbox`;
+      el.breadcrumb.innerHTML = `<a href="#">Home</a><span aria-hidden="true">/</span><span>${tool.category}</span><span aria-hidden="true">/</span><strong>${tool.title}</strong>`;
+    } else {
+      document.title = 'QA Toolbox – Free Utilities for QA Engineers';
+      el.breadcrumb.innerHTML = '<strong>All tools</strong>';
+    }
+
+    renderNavigation();
+    closeSidebar();
+    window.scrollTo(0, 0);
+
+    // Put the cursor in the tool's first field so you can paste right away.
+    if (tool) {
+      const field = sections.get(tool.id).querySelector('.tool-body textarea, .tool-body input:not([type="checkbox"]):not([type="range"])');
+      if (field) field.focus({ preventScroll: true });
+    }
+  };
+
+  window.addEventListener('hashchange', showRoute);
+
+  /* ---------- Mobile sidebar drawer ---------- */
+
+  const openSidebar = () => {
+    document.body.classList.add('sidebar-open');
+    el.menuBtn.setAttribute('aria-expanded', 'true');
+  };
+  const closeSidebar = () => {
+    document.body.classList.remove('sidebar-open');
+    el.menuBtn.setAttribute('aria-expanded', 'false');
+  };
+  el.menuBtn.addEventListener('click', openSidebar);
+  el.backdrop.addEventListener('click', closeSidebar);
+
+  /* ---------- Command palette ---------- */
+
+  let paletteItems = [];
+  let paletteIndex = 0;
+
+  /** Lower score = better match; null = no match. */
+  const scoreTool = (tool, query) => {
+    const title = tool.title.toLowerCase();
+    if (title.startsWith(query) || tool.id.startsWith(query)) return 0;
+    if (title.split(/[\s&/↔-]+/).some((w) => w.startsWith(query))) return 1;
+    if (title.includes(query)) return 2;
+    const words = query.split(/\s+/);
+    const haystack = `${title} ${tool.category} ${tool.keywords} ${tool.info}`.toLowerCase();
+    if (words.every((w) => haystack.includes(w))) return 3;
+    return null;
+  };
+
+  const paletteResults = (query) => {
+    if (!query) {
+      // Recents first, then favorites, then everything else.
+      const order = [...new Set([...recents, ...favorites, ...TOOLS.map((t) => t.id)])];
+      return order.map((id) => toolById.get(id));
+    }
+    return TOOLS
+      .map((tool, i) => ({ tool, i, score: scoreTool(tool, query) }))
+      .filter((r) => r.score !== null)
+      .sort((a, b) => a.score - b.score || a.i - b.i)
+      .map((r) => r.tool);
+  };
+
+  const renderPalette = () => {
+    const query = el.paletteInput.value.trim().toLowerCase();
+    paletteItems = paletteResults(query);
+    paletteIndex = Math.min(paletteIndex, Math.max(0, paletteItems.length - 1));
+
+    if (!paletteItems.length) {
+      el.paletteList.innerHTML = `<li class="palette-empty">No tools match "${QA.escapeHtml(query)}"</li>`;
+      el.paletteInput.removeAttribute('aria-activedescendant');
+      return;
+    }
+
+    el.paletteList.innerHTML = paletteItems.map((tool, i) => {
+      const tag = recents.includes(tool.id) && !query ? 'Recent' : isFavorite(tool.id) ? '★' : tool.category;
+      return `
+        <li class="palette-item" id="palette-item-${i}" role="option" data-index="${i}" aria-selected="${i === paletteIndex}">
+          <span class="nav-icon" aria-hidden="true">${tool.icon}</span>
+          <span class="palette-text">
+            <span class="palette-title">${tool.title}</span>
+            <span class="palette-desc">${QA.escapeHtml(summary(tool))}</span>
+          </span>
+          <span class="palette-tag">${tag}</span>
+        </li>`;
+    }).join('');
+    el.paletteInput.setAttribute('aria-activedescendant', `palette-item-${paletteIndex}`);
+    document.getElementById(`palette-item-${paletteIndex}`).scrollIntoView({ block: 'nearest' });
+  };
+
+  const openPalette = () => {
+    el.palette.hidden = false;
+    el.paletteInput.value = '';
+    paletteIndex = 0;
+    renderPalette();
+    el.paletteInput.focus();
+  };
+
+  const closePalette = () => {
+    el.palette.hidden = true;
+  };
+
+  const choosePaletteItem = (index) => {
+    const tool = paletteItems[index];
+    if (!tool) return;
+    closePalette();
+    if (location.hash === `#${tool.id}`) showRoute();
+    else location.hash = tool.id;
+  };
+
+  el.paletteInput.addEventListener('input', () => {
+    paletteIndex = 0;
+    renderPalette();
+  });
+
+  el.paletteInput.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      paletteIndex = (paletteIndex + step + paletteItems.length) % Math.max(1, paletteItems.length);
+      renderPalette();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      choosePaletteItem(paletteIndex);
+    } else if (e.key.toLowerCase() === 'd' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault(); // instead of "bookmark this page"
+      if (paletteItems[paletteIndex]) toggleFavorite(paletteItems[paletteIndex].id);
+    }
+  });
+
+  el.paletteList.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-index]');
+    if (item) choosePaletteItem(Number(item.dataset.index));
+  });
+  el.paletteList.addEventListener('mousemove', (e) => {
+    const item = e.target.closest('[data-index]');
+    if (item && Number(item.dataset.index) !== paletteIndex) {
+      paletteIndex = Number(item.dataset.index);
+      el.paletteList.querySelectorAll('[aria-selected]').forEach((li) => li.setAttribute('aria-selected', String(li === item)));
+      el.paletteInput.setAttribute('aria-activedescendant', item.id);
+    }
+  });
+  el.palette.querySelector('[data-close-palette]').addEventListener('click', closePalette);
+  document.getElementById('open-palette').addEventListener('click', openPalette);
+
+  document.querySelectorAll('[data-shortcut]').forEach((kbd) => { kbd.textContent = isMac ? '⌘ K' : 'Ctrl K'; });
+  el.palette.querySelectorAll('.palette-footer kbd').forEach((kbd) => {
+    if (isMac && kbd.textContent === 'Ctrl') kbd.textContent = '⌘';
+  });
+
+  /* ---------- Global keyboard shortcuts ---------- */
+
+  document.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+
+    if (e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (el.palette.hidden) openPalette();
+      else closePalette();
+    } else if (e.key === '/' && !typing && el.palette.hidden) {
+      e.preventDefault();
+      openPalette();
+    } else if (e.key === 'Escape') {
+      if (!el.palette.hidden) closePalette();
+      else closeSidebar();
+    }
+  });
+
+  /* ---------- Shared clicks (event delegation) ---------- */
+
+  document.addEventListener('click', (e) => {
+    const favBtn = e.target.closest('[data-fav]');
+    if (favBtn) {
+      e.preventDefault(); // star buttons sit inside card links
+      toggleFavorite(favBtn.dataset.fav);
       return;
     }
 
@@ -115,88 +388,11 @@
     if (copyValueBtn) QA.copy(copyValueBtn.dataset.copyValue);
   });
 
-  /* ---------- Search & category filter ---------- */
-
-  const matchesQuery = (tool, words) => {
-    const haystack = `${tool.title} ${tool.category} ${tool.keywords} ${tool.info}`.toLowerCase();
-    return words.every((w) => haystack.includes(w));
-  };
-
-  const renderChips = (counts) => {
-    chipsEl.innerHTML = ['All', ...CATEGORIES].map((cat) => `
-      <button type="button" class="chip" data-category="${cat}" aria-pressed="${cat === state.category}">
-        ${cat}<span class="count">${counts[cat] || 0}</span>
-      </button>`).join('');
-  };
-
-  const applyFilters = () => {
-    const words = state.query.toLowerCase().split(/\s+/).filter(Boolean);
-    const searchHits = TOOLS.filter((tool) => matchesQuery(tool, words));
-
-    // Chip counts reflect the current search so empty categories are obvious.
-    const counts = { All: searchHits.length };
-    searchHits.forEach((tool) => { counts[tool.category] = (counts[tool.category] || 0) + 1; });
-    renderChips(counts);
-
-    const visible = searchHits.filter((tool) => state.category === 'All' || tool.category === state.category);
-    const visibleIds = new Set(visible.map((t) => t.id));
-    sections.forEach((section, id) => { section.hidden = !visibleIds.has(id); });
-
-    quickNav.innerHTML = visible.map((t) => `<a href="#${t.id}">${t.title.replace(/ (Converter|Generator|Lookup|Tester|Reader|Parser|Formatter & Validator|Encoder \/ Decoder|Decoder)$/, '')}</a>`).join('');
-
-    emptyState.hidden = visible.length > 0;
-    emptyState.textContent = `No tools match "${state.query}"${state.category !== 'All' ? ` in ${state.category}` : ''}.`;
-  };
-
-  searchInput.addEventListener('input', () => {
-    state.query = searchInput.value.trim();
-    applyFilters();
-  });
-
-  chipsEl.addEventListener('click', (e) => {
-    const chip = e.target.closest('[data-category]');
-    if (!chip) return;
-    state.category = chip.dataset.category;
-    QA.storage.set('category', state.category);
-    applyFilters();
-  });
-
-  // "/" focuses search, Escape clears it.
-  document.addEventListener('keydown', (e) => {
-    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-    if (e.key === '/' && !typing) {
-      e.preventDefault();
-      searchInput.focus();
-    } else if (e.key === 'Escape' && document.activeElement === searchInput) {
-      searchInput.value = '';
-      state.query = '';
-      applyFilters();
-      searchInput.blur();
-    }
-  });
-
-  /* ---------- Deep link to a tool (#jwt) ---------- */
-
-  const revealFromHash = () => {
-    const section = sections.get(decodeURIComponent(location.hash.slice(1)));
-    if (!section) return;
-    if (section.hidden) {
-      state.query = '';
-      searchInput.value = '';
-      state.category = 'All';
-      applyFilters();
-    }
-    section.scrollIntoView();
-    section.classList.add('flash');
-    setTimeout(() => section.classList.remove('flash'), 1500);
-  };
-  window.addEventListener('hashchange', revealFromHash);
-
   /* ---------- Header / footer actions ---------- */
 
   document.getElementById('share-btn').addEventListener('click', async () => {
-    const data = { title: document.title, url: location.href.split('#')[0] };
-    if (navigator.share) {
+    const data = { title: document.title, url: location.href };
+    if (navigator.share && /Mobi/.test(navigator.userAgent)) {
       try { await navigator.share(data); } catch (e) { /* user cancelled */ }
     } else {
       QA.copy(data.url);
@@ -204,11 +400,10 @@
   });
 
   document.getElementById('clear-storage').addEventListener('click', () => {
-    if (!confirm('Clear all saved inputs and preferences on this device?')) return;
+    if (!confirm('Clear all saved inputs, favorites and preferences on this device?')) return;
     QA.storage.clear();
     location.reload();
   });
 
-  applyFilters();
-  if (location.hash) revealFromHash();
+  showRoute();
 })();

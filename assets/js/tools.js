@@ -20,7 +20,14 @@
    ========================================================================== */
 'use strict';
 
-const CATEGORIES = ['Data & Format', 'Encoding', 'Generators', 'Web & API', 'Testing'];
+/** Tools are grouped by QA workflow rather than by technical type. */
+const CATEGORIES = [
+  { name: 'API & Data', icon: '🌐' },
+  { name: 'Test Data', icon: '🧪' },
+  { name: 'Encode & Hash', icon: '🔣' },
+  { name: 'Time & Scheduling', icon: '🗓' },
+  { name: 'Testing Utilities', icon: '🛠' },
+];
 
 /** Output box with a copy button. */
 const outputBox = (ref, placeholder = 'Result will appear here', rows = '') =>
@@ -123,7 +130,7 @@ const TOOLS = [
     id: 'timestamp',
     icon: '⏱',
     title: 'Timestamp Converter',
-    category: 'Data & Format',
+    category: 'Time & Scheduling',
     keywords: 'unix epoch date time utc iso milliseconds seconds',
     info: 'Convert Unix timestamps to readable dates and back. Seconds, milliseconds and microseconds are detected automatically. Example: 1709899200 → 2024-03-08T12:00:00Z.',
     template: `
@@ -213,7 +220,7 @@ const TOOLS = [
     id: 'http',
     icon: '📡',
     title: 'HTTP Status Code Lookup',
-    category: 'Web & API',
+    category: 'API & Data',
     keywords: 'status code response api rest 404 500 error',
     info: 'Look up an HTTP status code by number (e.g. 429) or search by name (e.g. "timeout"). Use it to check what an API response really means.',
     template: `
@@ -252,10 +259,12 @@ const TOOLS = [
     id: 'json',
     icon: '{ }',
     title: 'JSON Formatter & Validator',
-    category: 'Data & Format',
+    category: 'API & Data',
     keywords: 'json pretty print beautify minify validate lint api response',
     info: 'Format, minify and validate JSON. Errors show the line and column so you can find broken API responses quickly.',
     template: `
+     <div class="split">
+      <div class="pane">
       <textarea data-ref="input" data-persist rows="7" spellcheck="false" aria-label="JSON input" placeholder='Paste JSON here, e.g. {"name":"John","tags":["qa"]}'></textarea>
       <div class="row wrap keep">
         <div class="btn-group">
@@ -270,8 +279,12 @@ const TOOLS = [
         </select>
         <label class="check"><input type="checkbox" data-ref="sort" data-persist> Sort keys</label>
       </div>
+      </div>
+      <div class="pane">
       <p class="hint" data-ref="note"></p>
-      ${outputBox('out')}`,
+      ${outputBox('out')}
+      </div>
+     </div>`,
     setup(ui) {
       // Numbers beyond 2^53 lose precision in JSON.parse (common with 64-bit IDs).
       // Where the engine exposes the source text, keep them as exact placeholders.
@@ -333,13 +346,19 @@ const TOOLS = [
     id: 'jwt',
     icon: '🔑',
     title: 'JWT Decoder',
-    category: 'Encoding',
+    category: 'API & Data',
     keywords: 'json web token auth bearer oauth claims exp decode',
     info: 'Decode a JWT to inspect its header, payload and signature. Time claims (exp, iat, nbf) are shown as dates and the token expiry is checked. The signature is NOT verified.',
     template: `
-      <textarea data-ref="input" data-persist rows="3" spellcheck="false" aria-label="JWT" placeholder="Paste a JWT (with or without the 'Bearer ' prefix)"></textarea>
+     <div class="split">
+      <div class="pane">
+      <textarea data-ref="input" data-persist rows="6" spellcheck="false" aria-label="JWT" placeholder="Paste a JWT (with or without the 'Bearer ' prefix)"></textarea>
       <div data-ref="status"></div>
-      ${outputBox('out', 'Decoded header and payload will appear here')}`,
+      </div>
+      <div class="pane">
+      ${outputBox('out', 'Decoded header and payload will appear here')}
+      </div>
+     </div>`,
     setup(ui) {
       const input = ui.$('input');
       const timeClaims = ['exp', 'iat', 'nbf', 'auth_time'];
@@ -395,7 +414,7 @@ const TOOLS = [
     id: 'base64',
     icon: '🔤',
     title: 'Base64 Encoder / Decoder',
-    category: 'Encoding',
+    category: 'Encode & Hash',
     keywords: 'base64 base64url encode decode auth header basic',
     info: 'Encode and decode Base64 with full UTF-8 support (emoji, Turkish characters…). Decoding also accepts Base64URL. Useful for tokens and Basic auth headers.',
     template: `
@@ -445,7 +464,7 @@ const TOOLS = [
     id: 'url',
     icon: '🔗',
     title: 'URL Encoder / Decoder',
-    category: 'Encoding',
+    category: 'Encode & Hash',
     keywords: 'url uri percent encode decode escape query string',
     info: '"Component" encodes everything except letters/digits (use it for query values). "Full URL" keeps characters like : / ? & = intact.',
     template: `
@@ -488,7 +507,7 @@ const TOOLS = [
     id: 'regex',
     icon: '🔍',
     title: 'Regex Tester',
-    category: 'Testing',
+    category: 'Testing Utilities',
     keywords: 'regular expression pattern match test validate log',
     info: 'Test a JavaScript regular expression live. Matches are highlighted and capture groups are listed. Flags: g = all matches, i = ignore case, m = multiline ^ $, s = dot matches newline, u = Unicode (needed for \\p{L}, emoji).',
     template: `
@@ -566,7 +585,7 @@ const TOOLS = [
     id: 'password',
     icon: '🔐',
     title: 'Password Generator',
-    category: 'Generators',
+    category: 'Test Data',
     keywords: 'password random secure strong test account credentials',
     info: 'Generate secure random passwords (Web Crypto) for test accounts. At least one character from every selected set is guaranteed.',
     template: `
@@ -640,7 +659,7 @@ const TOOLS = [
     id: 'uuid',
     icon: '🆔',
     title: 'UUID Generator',
-    category: 'Generators',
+    category: 'Test Data',
     keywords: 'uuid guid v4 random id identifier mock',
     info: 'Generate RFC 4122 version 4 UUIDs (cryptographically random) for test data or mock records.',
     template: `
@@ -675,7 +694,7 @@ const TOOLS = [
     id: 'hash',
     icon: '#️⃣',
     title: 'Hash Generator',
-    category: 'Generators',
+    category: 'Encode & Hash',
     keywords: 'hash md5 sha1 sha256 sha512 checksum digest',
     info: 'Generate MD5, SHA-1, SHA-256, SHA-384 and SHA-512 hashes of UTF-8 text. MD5 and SHA-1 are not secure — use them only for checksums and test data.',
     template: `
@@ -713,7 +732,7 @@ const TOOLS = [
     id: 'query',
     icon: '🔎',
     title: 'Query Parameter Parser',
-    category: 'Web & API',
+    category: 'API & Data',
     keywords: 'url query string parameters search params utm parse',
     info: 'Paste a full URL or just a query string (?a=1&b=2). Parameters are decoded and listed; repeated keys are kept.',
     template: `
@@ -761,11 +780,13 @@ const TOOLS = [
     id: 'jsoncsv',
     icon: '📊',
     title: 'JSON ↔ CSV Converter',
-    category: 'Data & Format',
+    category: 'API & Data',
     keywords: 'json csv convert export import excel spreadsheet table',
     info: 'Convert an array of JSON objects to CSV and back. Values with commas, quotes or line breaks are quoted correctly; nested objects are written as JSON.',
     template: `
-      <textarea data-ref="input" data-persist rows="6" spellcheck="false" aria-label="JSON or CSV" placeholder='[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]'></textarea>
+     <div class="split">
+      <div class="pane">
+      <textarea data-ref="input" data-persist rows="8" spellcheck="false" aria-label="JSON or CSV" placeholder='[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]'></textarea>
       <div class="row wrap keep">
         <div class="btn-group">
           <button type="button" class="btn" data-action="toCsv">JSON → CSV</button>
@@ -779,7 +800,11 @@ const TOOLS = [
         </select>
         <label class="check"><input type="checkbox" data-ref="types" data-persist checked> Detect numbers / booleans</label>
       </div>
-      ${outputBox('out')}`,
+      </div>
+      <div class="pane">
+      ${outputBox('out')}
+      </div>
+     </div>`,
     setup(ui) {
       /** Selected delimiter; "auto" picks the most frequent candidate in the first line (CSV → JSON only). */
       const delimiter = (sample = '') => {
@@ -875,7 +900,7 @@ const TOOLS = [
     id: 'fakedata',
     icon: '🎭',
     title: 'Fake Test Data Generator',
-    category: 'Generators',
+    category: 'Test Data',
     keywords: 'fake mock test data name email phone address user person',
     info: 'Generate a random test person: name, username, email, phone, address, company, birth date, UUID and IP. Emails use the reserved example.com domain, so they never reach a real inbox.',
     template: `
@@ -931,7 +956,7 @@ const TOOLS = [
     id: 'deeplink',
     icon: '📱',
     title: 'Deep Link Tester',
-    category: 'Web & API',
+    category: 'Testing Utilities',
     keywords: 'deep link universal link app link mobile ios android scheme adb simctl',
     info: 'Open a deep link (myapp://…) or universal link on this device, or copy a ready-made command to open it in an Android emulator (adb) or iOS simulator (simctl). Your last links are remembered.',
     template: `
@@ -1025,7 +1050,7 @@ const TOOLS = [
     id: 'cron',
     icon: '⏰',
     title: 'Cron Expression Reader',
-    category: 'Testing',
+    category: 'Time & Scheduling',
     keywords: 'cron crontab schedule job scheduler next run time',
     info: 'Explain a cron expression in plain English and list the next run times (in your local time zone). Format: minute hour day-of-month month day-of-week. Macros like @daily are supported.',
     template: `

@@ -29,43 +29,74 @@
 </head>
 <body>
 
-  <header class="site-header">
-    <div class="header-actions">
-      <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
-        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-      </button>
-      <button type="button" class="icon-btn" id="share-btn" aria-label="Share this page" title="Share">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-      </button>
-    </div>
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Tools">
+      <a href="#" class="brand"><span class="gradient-text">QA</span> Toolbox</a>
 
-    <h1 class="site-title"><span class="gradient-text">QA</span> Toolbox</h1>
-    <p class="site-subtitle">Free Utilities for QA Engineers and Developers</p>
-    <p class="site-author">Made by <a href="https://github.com/huseyinkesmez" target="_blank" rel="noopener">Huseyin Kesmez</a></p>
-  </header>
-
-  <div class="toolbar">
-    <div class="toolbar-inner">
-      <div class="search">
+      <button type="button" class="search-trigger" id="open-palette">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <label for="tool-search" class="sr-only">Search tools</label>
-        <input type="search" id="tool-search" placeholder="Search tools… (e.g. jwt, csv, hash)" autocomplete="off">
-        <kbd>/</kbd>
+        <span>Search tools…</span>
+        <kbd data-shortcut>Ctrl K</kbd>
+      </button>
+
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+
+      <div class="sidebar-footer">
+        Made by <a href="https://github.com/huseyinkesmez" target="_blank" rel="noopener">Huseyin Kesmez</a>
       </div>
-      <div class="chips" id="category-chips" role="toolbar" aria-label="Filter by category"></div>
-      <nav class="chips quick-nav" id="quick-nav" aria-label="Jump to tool"></nav>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <div class="main-col">
+      <header class="topbar">
+        <button type="button" class="icon-btn menu-btn" id="menu-btn" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <nav class="breadcrumb" id="breadcrumb" aria-label="Breadcrumb"></nav>
+        <div class="topbar-actions">
+          <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle theme">
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
+          <button type="button" class="icon-btn" id="share-btn" aria-label="Share this page" title="Share / copy link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="tools-container">
+        <section class="home" id="home" aria-labelledby="home-title">
+          <div class="hero">
+            <h1 class="site-title" id="home-title"><span class="gradient-text">QA</span> Toolbox</h1>
+            <p class="site-subtitle">Free Utilities for QA Engineers and Developers</p>
+            <p class="hint">Press <kbd data-shortcut>Ctrl K</kbd> or <kbd>/</kbd> anywhere to jump to a tool.</p>
+          </div>
+          <div id="home-groups"></div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>Everything runs locally in your browser. Your last inputs, favorites and recent tools are remembered on this device only.
+          <button type="button" class="btn btn-secondary btn-sm" id="clear-storage">Clear saved data</button>
+        </p>
+      </footer>
     </div>
   </div>
 
-  <main id="tools-container" aria-live="polite"></main>
-
-  <footer class="site-footer">
-    <p>QA Toolbox – Free developer utilities for QA engineers &amp; developers.</p>
-    <p>Everything runs locally in your browser. Your last inputs are remembered on this device only.
-      <button type="button" class="btn btn-secondary btn-sm" id="clear-storage">Clear saved data</button>
-    </p>
-  </footer>
+  <!-- Command palette (Ctrl/Cmd + K) -->
+  <div class="palette" id="palette" hidden>
+    <div class="palette-backdrop" data-close-palette></div>
+    <div class="palette-dialog" role="dialog" aria-modal="true" aria-label="Search tools">
+      <div class="palette-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="text" id="palette-input" placeholder="Search tools… (e.g. jwt, csv, sha256)" autocomplete="off" spellcheck="false"
+               role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list">
+        <kbd>Esc</kbd>
+      </div>
+      <ul class="palette-list" id="palette-list" role="listbox"></ul>
+      <div class="palette-footer"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> open</span><span><kbd>Ctrl</kbd><kbd>D</kbd> toggle favorite</span></div>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
