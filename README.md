@@ -34,4 +34,6 @@ assets/js/tools.js    tool definitions – add a new tool here
 assets/js/app.js      sidebar, routing, palette, favorites/recents, theme, persistence
 ```
 
+When you change CSS or JS, bump the `?v=` number on the asset links in `index.html`. GitHub Pages caches files for 10 minutes, and without it an open tab can mix new HTML with old scripts.
+
 To add a tool, append an object to `TOOLS` in `assets/js/tools.js` (see the comment at the top of that file).
