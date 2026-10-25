@@ -270,8 +270,26 @@ const TOOLS = [
         </select>
         <label class="check"><input type="checkbox" data-ref="sort" data-persist> Sort keys</label>
       </div>
+      <p class="hint" data-ref="note"></p>
       ${outputBox('out')}`,
     setup(ui) {
+      // Numbers beyond 2^53 lose precision in JSON.parse (common with 64-bit IDs).
+      // Where the engine exposes the source text, keep them as exact placeholders.
+      const BIG = '\u0000BIG:';
+      const parseExact = (input) => {
+        let bigCount = 0;
+        const data = JSON.parse(input, (key, value, context) => {
+          if (typeof value === 'number' && context && context.source && !Number.isSafeInteger(value) && /^-?\d+$/.test(context.source)) {
+            bigCount++;
+            return `${BIG}${context.source}\u0000`;
+          }
+          return value;
+        });
+        return { data, bigCount };
+      };
+      const stringifyExact = (data, indent) =>
+        JSON.stringify(data, null, indent).replace(/"\\u0000BIG:(-?\d+)\\u0000"/g, '$1');
+
       const sortKeys = (value) => {
         if (Array.isArray(value)) return value.map(sortKeys);
         if (value && typeof value === 'object') {
@@ -285,18 +303,20 @@ const TOOLS = [
         const out = ui.$('out');
         if (!input.trim()) return QA.setOutput(out, '');
         ui.save('action', action);
+        ui.$('note').textContent = '';
 
-        let data;
+        let data, bigCount;
         try {
-          data = JSON.parse(input);
+          ({ data, bigCount } = parseExact(input));
         } catch (e) {
           return QA.setOutput(out, QA.jsonError(input, e), 'error');
         }
         if (ui.$('sort').checked) data = sortKeys(data);
+        if (bigCount) ui.$('note').textContent = `ℹ ${bigCount} number(s) larger than 2^53 were kept exactly. Many JSON clients (JavaScript, some JSON libraries) would round them.`;
 
         const indent = ui.$('indent').value === 'tab' ? '\t' : Number(ui.$('indent').value);
-        if (action === 'format') QA.setOutput(out, JSON.stringify(data, null, indent));
-        else if (action === 'minify') QA.setOutput(out, JSON.stringify(data));
+        if (action === 'format') QA.setOutput(out, stringifyExact(data, indent));
+        else if (action === 'minify') QA.setOutput(out, stringifyExact(data));
         else {
           const type = Array.isArray(data) ? `array with ${data.length} item(s)` : data === null ? 'null' : typeof data === 'object' ? `object with ${Object.keys(data).length} key(s)` : typeof data;
           QA.setOutput(out, `✓ Valid JSON (${type})`, 'success');
@@ -400,10 +420,18 @@ const TOOLS = [
           if (ui.$('urlSafe').checked) encoded = encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
           return QA.setOutput(out, encoded);
         }
+        let bytes;
         try {
-          QA.setOutput(out, QA.base64.decode(value));
+          bytes = QA.base64.decodeBytes(value);
         } catch (e) {
-          QA.setOutput(out, 'Invalid Base64 (or the decoded bytes are not valid UTF-8 text)', 'error');
+          return QA.setOutput(out, 'Invalid Base64', 'error');
+        }
+        try {
+          QA.setOutput(out, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+        } catch (e) {
+          // Not text (image, protobuf, encrypted data…): show the bytes instead.
+          const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join(' ');
+          QA.setOutput(out, `Binary data (${bytes.length} bytes, not UTF-8 text) – hex:\n${hex}`);
         }
       };
 
@@ -462,7 +490,7 @@ const TOOLS = [
     title: 'Regex Tester',
     category: 'Testing',
     keywords: 'regular expression pattern match test validate log',
-    info: 'Test a JavaScript regular expression live. Matches are highlighted and capture groups are listed. Flags: g = all matches, i = ignore case, m = multiline ^ $, s = dot matches newline.',
+    info: 'Test a JavaScript regular expression live. Matches are highlighted and capture groups are listed. Flags: g = all matches, i = ignore case, m = multiline ^ $, s = dot matches newline, u = Unicode (needed for \\p{L}, emoji).',
     template: `
       <div class="row keep">
         <input type="text" data-ref="pattern" data-persist spellcheck="false" aria-label="Regex pattern" placeholder="Pattern, e.g. \\b[\\w.-]+@[\\w.-]+\\.\\w+\\b">
@@ -472,6 +500,7 @@ const TOOLS = [
         <label class="check"><input type="checkbox" data-ref="i" data-persist> i</label>
         <label class="check"><input type="checkbox" data-ref="m" data-persist> m</label>
         <label class="check"><input type="checkbox" data-ref="s" data-persist> s</label>
+        <label class="check"><input type="checkbox" data-ref="u" data-persist> u</label>
       </div>
       <textarea data-ref="text" data-persist rows="4" spellcheck="false" aria-label="Test string" placeholder="Test string"></textarea>
       <div>
@@ -490,7 +519,7 @@ const TOOLS = [
         preview.innerHTML = '';
         if (!pattern) return QA.setOutput(out, '');
 
-        const flags = ['g', 'i', 'm', 's'].filter((f) => ui.$(f).checked).join('');
+        const flags = ['g', 'i', 'm', 's', 'u'].filter((f) => ui.$(f).checked).join('');
         let re;
         try {
           // Always iterate with "g"; without the user's g flag we stop after the first match.
@@ -743,6 +772,7 @@ const TOOLS = [
           <button type="button" class="btn btn-secondary" data-action="toJson">CSV → JSON</button>
         </div>
         <select data-ref="delimiter" data-persist aria-label="Delimiter" style="flex:0 0 9rem">
+          <option value="auto">Auto-detect</option>
           <option value=",">Comma ,</option>
           <option value=";">Semicolon ;</option>
           <option value="tab">Tab</option>
@@ -751,7 +781,16 @@ const TOOLS = [
       </div>
       ${outputBox('out')}`,
     setup(ui) {
-      const delimiter = () => (ui.$('delimiter').value === 'tab' ? '\t' : ui.$('delimiter').value);
+      /** Selected delimiter; "auto" picks the most frequent candidate in the first line (CSV → JSON only). */
+      const delimiter = (sample = '') => {
+        const value = ui.$('delimiter').value;
+        if (value === 'tab') return '\t';
+        if (value !== 'auto') return value;
+        const firstLine = sample.split(/\r?\n/)[0];
+        const counts = [',', ';', '\t', '|'].map((d) => [d, firstLine.split(d).length - 1]);
+        const [best, count] = counts.sort((a, b) => b[1] - a[1])[0];
+        return count > 0 ? best : ',';
+      };
 
       const cell = (value, delim) => {
         if (value === null || value === undefined) return '';
@@ -804,7 +843,7 @@ const TOOLS = [
       };
 
       const toJson = (input) => {
-        const [header, ...rows] = parseCsv(input, delimiter());
+        const [header, ...rows] = parseCsv(input, delimiter(input));
         if (!header) throw new Error('CSV is empty');
         const detect = ui.$('types').checked;
         return JSON.stringify(rows.map((r) => Object.fromEntries(header.map((k, i) => {
@@ -916,6 +955,7 @@ const TOOLS = [
         return url;
       };
 
+      const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (e) { return s; } };
       const shellQuote = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
 
       const renderHistory = () => {
@@ -934,7 +974,7 @@ const TOOLS = [
 
         const rows = [['Scheme', result.protocol.replace(':', '')]];
         if (result.host) rows.push(['Host', result.host]);
-        if (result.pathname && result.pathname !== '/') rows.push(['Path', decodeURIComponent(result.pathname)]);
+        if (result.pathname && result.pathname !== '/') rows.push(['Path', safeDecode(result.pathname)]);
         result.searchParams.forEach((v, k) => rows.push([`?${k}`, v]));
         ui.$('parts').innerHTML = rows.map(([k, v]) => kvRow(k, v)).join('');
 

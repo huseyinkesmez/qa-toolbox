@@ -74,7 +74,8 @@ QA.cron = (() => {
     const expanded = MACROS[raw.toLowerCase()] || raw;
     const parts = expanded.split(' ');
     if (parts.length !== 5) {
-      throw new Error(`Expected 5 fields (minute hour day-of-month month day-of-week), got ${parts.length}`);
+      const hint = parts.length === 6 || parts.length === 7 ? ' – this looks like a Quartz / Spring expression with seconds; remove the first (seconds) field' : '';
+      throw new Error(`Expected 5 fields (minute hour day-of-month month day-of-week), got ${parts.length}${hint}`);
     }
     const fields = {};
     FIELDS.forEach((field, i) => {
@@ -114,7 +115,7 @@ QA.cron = (() => {
 
     if (isSingle(minute) && isSingle(hour)) {
       time = `At ${pad(hour.text)}:${pad(minute.text)}`;
-    } else if (isSingle(minute) && hour.text !== '*') {
+    } else if (isSingle(minute) && hour.text !== '*' && hour.values.size <= 4) {
       time = `At ${listText(hour.values, (h) => `${pad(h)}:${pad(minute.text)}`)}`;
     } else {
       const m = fieldPhrase(minute, 'minute');
@@ -122,7 +123,7 @@ QA.cron = (() => {
       if (!m && !h) time = 'Every minute';
       else if (!m) time = `Every minute of ${h}`;
       else if (minute.text === '0' && !h) time = 'Every hour, on the hour';
-      else time = `${m.startsWith('every') ? m[0].toUpperCase() + m.slice(1) : `At ${m}`}${h ? `, past ${h}` : isSingle(minute) ? ' past every hour' : ''}`;
+      else time = `${m.startsWith('every') ? m[0].toUpperCase() + m.slice(1) : `At ${m}`}${h ? (h.startsWith('every') ? `, ${h}` : `, past ${h}`) : isSingle(minute) ? ' past every hour' : ''}`;
     }
 
     const parts = [time];

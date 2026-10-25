@@ -53,7 +53,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; scroll-padding-top: 8.5rem; }
+html { scroll-behavior: smooth; scroll-padding-top: 10.5rem; }
 
 body {
   margin: 0;
@@ -439,6 +439,7 @@ mark {
 }
 
 .hint { font-size: .8rem; color: hsl(var(--muted-foreground)); margin: 0; }
+.hint:empty { display: none; }
 
 .badge {
   display: inline-block;

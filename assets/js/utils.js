@@ -101,14 +101,16 @@ QA.base64 = {
     bytes.forEach((b) => { bin += String.fromCharCode(b); });
     return btoa(bin);
   },
-  decode(b64) {
-    // Accept base64url and missing padding as well.
+  /** Decode to raw bytes. Accepts base64url and missing padding as well. */
+  decodeBytes(b64) {
     let s = b64.trim().replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
     if (s.length % 4 === 1) throw new Error('Invalid Base64 length');
     s += '='.repeat((4 - (s.length % 4)) % 4);
-    const bin = atob(s);
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  },
+  /** Decode to UTF-8 text; throws if the bytes are not valid UTF-8. */
+  decode(b64) {
+    return new TextDecoder('utf-8', { fatal: true }).decode(this.decodeBytes(b64));
   },
 };
 
