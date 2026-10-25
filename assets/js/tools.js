@@ -957,16 +957,25 @@ const TOOLS = [
     icon: '📱',
     title: 'Deep Link Tester',
     category: 'Testing Utilities',
-    keywords: 'deep link universal link app link mobile ios android scheme adb simctl',
-    info: 'Open a deep link (myapp://…) or universal link on this device, or copy a ready-made command to open it in an Android emulator (adb) or iOS simulator (simctl). Your last links are remembered.',
+    keywords: 'deep link universal link app link mobile ios android scheme adb simctl qr code scan phone',
+    info: 'Type a deep link (myapp://…) or universal link and scan the QR code with your phone to open it on a real device. You can also open it here or copy a ready-made adb / simctl command for emulators. Your last links are remembered.',
     template: `
+     <div class="split split-qr">
+      <div class="pane">
       <div class="row">
         <input type="text" data-ref="input" data-persist spellcheck="false" aria-label="Deep link" placeholder="myapp://product/42?ref=qa">
         <button type="button" class="btn" data-ref="open">Open</button>
       </div>
       <div class="chips" data-ref="history"></div>
       <div class="kv" data-ref="parts"></div>
-      ${outputBox('out', 'adb / simctl commands will appear here')}`,
+      ${outputBox('out', 'adb / simctl commands will appear here')}
+      </div>
+      <div class="pane qr-pane">
+        <div class="qr-box" data-ref="qr"><span class="hint">QR code appears here</span></div>
+        <p class="hint qr-caption">Scan with your phone camera to open the link on the device.</p>
+        <button type="button" class="btn btn-secondary btn-sm" data-ref="downloadQr" disabled>Download QR</button>
+      </div>
+     </div>`,
     setup(ui) {
       const BLOCKED = ['javascript:', 'data:', 'vbscript:', 'file:'];
       const MAX_HISTORY = 6;
@@ -978,6 +987,35 @@ const TOOLS = [
         try { url = new URL(value); } catch (e) { return 'Invalid link: it must include a scheme, e.g. myapp://path or https://…'; }
         if (BLOCKED.includes(url.protocol)) return `The ${url.protocol} scheme is blocked for safety`;
         return url;
+      };
+
+      // Phone cameras expect UTF-8 for non-ASCII characters (ș, ä, Кирилица…).
+      qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+
+      /** Draw the QR code for `text`, or a placeholder message when there is nothing valid to encode. */
+      const renderQr = (text, message = 'QR code appears here') => {
+        const box = ui.$('qr');
+        const download = ui.$('downloadQr');
+        download.disabled = true;
+        if (!text) {
+          box.innerHTML = `<span class="hint">${QA.escapeHtml(message)}</span>`;
+          return;
+        }
+        try {
+          const qr = qrcode(0, 'M'); // auto size, ~15% error correction
+          qr.addData(text);
+          qr.make();
+          box.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 8, scalable: true, alt: `QR code for ${text}` });
+          download.disabled = false;
+          download.onclick = () => {
+            const a = document.createElement('a');
+            a.href = qr.createDataURL(8, 32); // GIF image
+            a.download = 'deeplink-qr.gif';
+            a.click();
+          };
+        } catch (e) {
+          box.innerHTML = '<span class="hint">Link is too long for a QR code</span>';
+        }
       };
 
       const safeDecode = (s) => { try { return decodeURIComponent(s); } catch (e) { return s; } };
@@ -994,8 +1032,15 @@ const TOOLS = [
         const value = ui.$('input').value.trim();
         const result = validate(value);
         ui.$('parts').innerHTML = '';
-        if (!result) return QA.setOutput(ui.$('out'), '');
-        if (typeof result === 'string') return QA.setOutput(ui.$('out'), result, 'error');
+        if (!result) {
+          renderQr(null);
+          return QA.setOutput(ui.$('out'), '');
+        }
+        if (typeof result === 'string') {
+          renderQr(null, 'Enter a valid link to get a QR code');
+          return QA.setOutput(ui.$('out'), result, 'error');
+        }
+        renderQr(value);
 
         const rows = [['Scheme', result.protocol.replace(':', '')]];
         if (result.host) rows.push(['Host', result.host]);

@@ -29,7 +29,7 @@ Then open http://localhost:5173.
 index.html            page shell
 assets/styles.css     theme (CSS variables for light / dark)
 assets/js/utils.js    shared helpers (storage, copy, toast, base64, uuid…)
-assets/js/lib/        md5 and cron parser
+assets/js/lib/        md5, cron parser, qrcode.js (qrcode-generator 1.4.4, MIT, © Kazuhiko Arase)
 assets/js/tools.js    tool definitions – add a new tool here
 assets/js/app.js      sidebar, routing, palette, favorites/recents, theme, persistence
 ```
