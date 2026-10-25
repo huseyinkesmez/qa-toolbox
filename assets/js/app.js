@@ -125,17 +125,38 @@
 
   /* ---------- Sidebar & home ---------- */
 
+  const MAX_SIDEBAR_RECENT = 4;
+  let activeId = null; // id of the tool currently shown, null on the home page
+  let collapsedGroups = QA.storage.get('collapsedGroups', []);
+
   const navLink = (tool) => `
     <a href="#${tool.id}" class="nav-link" data-tool="${tool.id}">
       <span class="nav-icon" aria-hidden="true">${tool.icon}</span>
       <span class="nav-label">${tool.title}</span>
     </a>`;
 
-  const navGroup = (title, icon, tools) => (tools.length ? `
-    <div class="nav-group">
-      <h2 class="nav-group-title"><span aria-hidden="true">${icon}</span> ${title}</h2>
+  /** "Favorites" / "Recent" lists at the top of the sidebar. */
+  const personalGroup = (title, tools) => (tools.length ? `
+    <div class="nav-personal-group">
+      <h2 class="nav-label-small">${title}</h2>
       ${tools.map(navLink).join('')}
     </div>` : '');
+
+  /** Collapsible category with a guide line under its heading. */
+  const categoryGroup = (category) => {
+    const tools = toolsIn(category.name);
+    // Never hide the tool you are looking at.
+    const open = !collapsedGroups.includes(category.name) || tools.some((t) => t.id === activeId);
+    return `
+      <div class="nav-category">
+        <button type="button" class="nav-category-toggle" data-category="${category.name}" aria-expanded="${open}">
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+          <span class="nav-category-name">${category.name}</span>
+          <span class="nav-count">${tools.length}</span>
+        </button>
+        <div class="nav-items"${open ? '' : ' hidden'}>${tools.map(navLink).join('')}</div>
+      </div>`;
+  };
 
   const toolCard = (tool) => `
     <a href="#${tool.id}" class="tool-card">
@@ -147,9 +168,9 @@
       ${starButton(tool.id, 'card-star')}
     </a>`;
 
-  const homeGroup = (title, icon, tools) => (tools.length ? `
-    <section class="home-group">
-      <h2 class="home-group-title"><span aria-hidden="true">${icon}</span> ${title}</h2>
+  const homeGroup = (title, tools, extraClass = '') => (tools.length ? `
+    <section class="home-group ${extraClass}">
+      <h2 class="home-group-title">${title}<span class="nav-count">${tools.length}</span></h2>
       <div class="card-grid">${tools.map(toolCard).join('')}</div>
     </section>` : '');
 
@@ -158,19 +179,20 @@
 
   /** Re-render everything that depends on favorites / recents / the active tool. */
   const renderNavigation = () => {
-    el.sidebarNav.innerHTML = [
-      navGroup('Favorites', '★', byIds(favorites)),
-      navGroup('Recent', '🕘', byIds(recents)),
-      ...CATEGORIES.map((c) => navGroup(c.name, c.icon, toolsIn(c.name))),
-    ].join('');
+    // Recent excludes the open tool and favorites, so nothing is listed twice.
+    const sidebarRecents = recents.filter((id) => id !== activeId && !isFavorite(id)).slice(0, MAX_SIDEBAR_RECENT);
+    const personal = personalGroup('★ Favorites', byIds(favorites)) + personalGroup('Recent', byIds(sidebarRecents));
 
-    el.homeGroups.innerHTML = [
-      favorites.length
-        ? homeGroup('Favorites', '★', byIds(favorites))
-        : '<p class="hint home-tip">Tip: click the ☆ on any tool to pin it to Favorites.</p>',
-      homeGroup('Recently used', '🕘', byIds(recents)),
-      ...CATEGORIES.map((c) => homeGroup(c.name, c.icon, toolsIn(c.name))),
-    ].join('');
+    el.sidebarNav.innerHTML = `
+      ${personal ? `<div class="nav-personal">${personal}</div>` : ''}
+      <h2 class="nav-label-small nav-tools-label">All tools</h2>
+      ${CATEGORIES.map(categoryGroup).join('')}`;
+
+    const homeRecents = recents.filter((id) => !isFavorite(id));
+    const yourTools = homeGroup('★ Favorites', byIds(favorites)) + homeGroup('Recently used', byIds(homeRecents));
+    el.homeGroups.innerHTML = `
+      ${yourTools ? `<div class="home-personal">${yourTools}</div>` : '<p class="hint home-tip">Tip: click the ☆ on any tool to pin it to Favorites.</p>'}
+      ${CATEGORIES.map((c) => homeGroup(c.name, toolsIn(c.name))).join('')}`;
 
     sections.forEach((section, id) => {
       section.querySelector('[data-star-slot]').innerHTML = starButton(id);
@@ -178,9 +200,18 @@
     markActiveLink();
   };
 
-  /* ---------- Routing (#tool-id) ---------- */
+  el.sidebarNav.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.nav-category-toggle');
+    if (!toggle) return;
+    const name = toggle.dataset.category;
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.nextElementSibling.hidden = !open;
+    collapsedGroups = open ? collapsedGroups.filter((g) => g !== name) : [...collapsedGroups, name];
+    QA.storage.set('collapsedGroups', collapsedGroups);
+  });
 
-  let activeId = null;
+  /* ---------- Routing (#tool-id) ---------- */
 
   const markActiveLink = () => {
     el.sidebarNav.querySelectorAll('.nav-link').forEach((a) => {
@@ -219,18 +250,25 @@
 
   window.addEventListener('hashchange', showRoute);
 
-  /* ---------- Mobile sidebar drawer ---------- */
+  /* ---------- Sidebar show / hide ---------- */
 
-  const openSidebar = () => {
-    document.body.classList.add('sidebar-open');
-    el.menuBtn.setAttribute('aria-expanded', 'true');
+  // Desktop: the sidebar always starts open and can be hidden with the « / ☰ buttons.
+  // Narrow screens: it is a drawer that slides over the page.
+  const isNarrow = () => window.matchMedia('(max-width: 900px)').matches;
+
+  const setSidebar = (open) => {
+    const cls = isNarrow() ? 'sidebar-open' : 'sidebar-collapsed';
+    document.body.classList.toggle(cls, isNarrow() ? open : !open);
+    el.menuBtn.setAttribute('aria-expanded', String(open));
   };
-  const closeSidebar = () => {
-    document.body.classList.remove('sidebar-open');
-    el.menuBtn.setAttribute('aria-expanded', 'false');
-  };
-  el.menuBtn.addEventListener('click', openSidebar);
-  el.backdrop.addEventListener('click', closeSidebar);
+  const isSidebarOpen = () => (isNarrow()
+    ? document.body.classList.contains('sidebar-open')
+    : !document.body.classList.contains('sidebar-collapsed'));
+  const closeSidebar = () => { if (isNarrow()) setSidebar(false); };
+
+  el.menuBtn.addEventListener('click', () => setSidebar(!isSidebarOpen()));
+  document.getElementById('collapse-btn').addEventListener('click', () => setSidebar(false));
+  el.backdrop.addEventListener('click', () => setSidebar(false));
 
   /* ---------- Command palette ---------- */
 
@@ -363,7 +401,7 @@
       openPalette();
     } else if (e.key === 'Escape') {
       if (!el.palette.hidden) closePalette();
-      else closeSidebar();
+      else closeSidebar(); // narrow-screen drawer only
     }
   });
 

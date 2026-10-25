@@ -81,6 +81,11 @@ a:hover { text-decoration: underline; }
   min-height: 100vh;
 }
 
+/* Desktop: sidebar hidden with the « button */
+.sidebar-collapsed .app { grid-template-columns: 0 minmax(0, 1fr); }
+.sidebar-collapsed .sidebar { visibility: hidden; border-right: 0; }
+.sidebar-collapsed .topbar .menu-btn { display: inline-grid; }
+
 :root { --sidebar-w: 268px; }
 
 .sidebar {
@@ -95,6 +100,14 @@ a:hover { text-decoration: underline; }
   border-right: 1px solid hsl(var(--border));
   overflow: hidden;
 }
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+}
+.sidebar-header .icon-btn { width: 2rem; height: 2rem; }
 
 .brand {
   font-size: 1.35rem;
@@ -151,25 +164,85 @@ kbd {
   scrollbar-width: thin;
 }
 
-.nav-group + .nav-group { margin-top: .9rem; }
-
-.nav-group-title {
-  margin: 0 0 .25rem;
+/* Small uppercase section labels: "Favorites", "Recent", "All tools" */
+.nav-label-small {
+  margin: 0 0 .3rem;
   padding: 0 .5rem;
-  font-size: .7rem;
+  font-size: .68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: .08em;
   color: hsl(var(--muted-foreground));
 }
+
+/* Favorites + Recent block, separated from the categories */
+.nav-personal {
+  display: grid;
+  gap: .85rem;
+  padding-bottom: .9rem;
+  margin-bottom: .9rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.nav-personal .nav-link { font-size: .85rem; }
+
+.nav-tools-label { margin-bottom: .4rem; }
+
+.nav-category + .nav-category { margin-top: .15rem; }
+
+.nav-category-toggle {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  width: 100%;
+  padding: .4rem .5rem;
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  text-align: left;
+  color: hsl(var(--foreground));
+  background: transparent;
+  border: 0;
+  border-radius: .5rem;
+  cursor: pointer;
+}
+.nav-category-toggle:hover { background: hsl(var(--muted)); }
+.nav-category-toggle:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -2px; }
+.nav-category-toggle .chevron {
+  width: .85rem;
+  height: .85rem;
+  flex: 0 0 auto;
+  color: hsl(var(--muted-foreground));
+  transition: transform .15s;
+}
+.nav-category-toggle[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.nav-category-name { flex: 1; }
+
+.nav-count {
+  font-size: .7rem;
+  font-weight: 500;
+  min-width: 1.4rem;
+  text-align: center;
+  padding: .05rem .4rem;
+  border-radius: 999px;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+}
+
+/* Tools hang off a thin guide line under their category */
+.nav-items {
+  margin: .1rem 0 .5rem .9rem;
+  padding-left: .4rem;
+  border-left: 1px solid hsl(var(--border));
+}
+.nav-items[hidden] { display: none; }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: .55rem;
-  padding: .38rem .5rem;
+  gap: .5rem;
+  padding: .32rem .5rem;
   border-radius: .5rem;
-  font-size: .88rem;
+  font-size: .86rem;
   color: hsl(var(--foreground) / .85);
 }
 .nav-link:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); text-decoration: none; }
@@ -178,7 +251,7 @@ kbd {
   color: hsl(var(--primary));
   font-weight: 600;
 }
-.nav-icon { width: 1.4rem; text-align: center; flex: 0 0 auto; font-size: .95rem; }
+.nav-icon { width: 1.25rem; text-align: center; flex: 0 0 auto; font-size: .9rem; }
 .nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .sidebar-footer {
@@ -253,16 +326,31 @@ main {
   color: hsl(var(--muted-foreground));
 }
 
-.hint.home-tip { margin: -1rem 0 1.75rem; }
+.hint.home-tip { margin: -1rem 0 2rem; }
 
-.home-group + .home-group { margin-top: 2rem; }
-.home-group-title > span, .nav-group-title > span { display: inline-block; margin-right: .35rem; }
+/* Favorites + Recently used sit in their own block above the categories */
+.home-personal {
+  padding: 1.25rem;
+  margin-bottom: 2.5rem;
+  background: hsl(var(--primary) / .05);
+  border: 1px solid hsl(var(--primary) / .15);
+  border-radius: calc(var(--radius) + .25rem);
+}
+
+.home-group + .home-group {
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid hsl(var(--border));
+}
 
 .home-group-title {
-  margin: 0 0 .75rem;
-  font-size: .95rem;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0 0 .9rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
 }
 
 .card-grid {
@@ -714,7 +802,9 @@ mark {
 
 /* Below 900px the sidebar becomes a drawer */
 @media (max-width: 900px) {
-  .app { grid-template-columns: minmax(0, 1fr); }
+  .app, .sidebar-collapsed .app { grid-template-columns: minmax(0, 1fr); }
+  .sidebar-collapsed .sidebar { visibility: visible; }
+  .sidebar-header .icon-btn { display: none; }
   .sidebar {
     position: fixed;
     left: 0;
